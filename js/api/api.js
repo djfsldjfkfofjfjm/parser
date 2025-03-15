@@ -1,6 +1,3 @@
-// Импортируем cacheManager из модуля cache-manager.js
-import { cacheManager } from '../utils/index.js';
-
 // Константы для API
 const FIRECRAWL_API_KEY = 'fc-28f038d334bc40bda77427cf1f275229';
 const GEMINI_API_KEY = 'AIzaSyDWC3Mh8zfN7GaVqNGC_GIm3XwKSn0g4gs';
@@ -160,6 +157,77 @@ const processWithGeminiCache = async (url, content, prompt) => {
     return extractedText;
 };
 
+// Получение структуры сайта без кэширования
+const getWebsiteMapDirect = async (websiteUrl) => {
+    const response = await fetchWithRetry('https://api.firecrawl.dev/v1/map', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: websiteUrl })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+};
+
+// Парсинг URL без кэширования
+const parseUrl = async (url) => {
+    // Проверка на невалидные URL
+    if (url.startsWith('javascript:') || url === '#' || url === '') {
+        throw new Error('Invalid URL: JavaScript link or empty URL');
+    }
+    
+    const response = await fetchWithRetry('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            url: url,
+            formats: ['markdown'],
+            onlyMainContent: true,
+            blockAds: true,
+            removeBase64Images: true
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return await response.json();
+};
+
+// Обработка через Gemini без кэширования
+const processWithGemini = async (url, content, prompt) => {
+    const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp-01-21:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const response = await fetchWithRetry(geminiApiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            "contents": [{
+                "parts": [{"text": prompt + "\n\n" + content}]
+            }]
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.candidates[0]?.content?.parts[0]?.text || 'Не удалось извлечь информацию';
+};
+
 // Экспортируем константы и функции
 export {
     FIRECRAWL_API_KEY,
@@ -170,5 +238,9 @@ export {
     fetchWithRetry,
     getWebsiteMap,
     parseUrlWithCache,
-    processWithGeminiCache
+    processWithGeminiCache,
+    // Добавляем новые функции в экспорт
+    getWebsiteMapDirect,
+    parseUrl,
+    processWithGemini
 };

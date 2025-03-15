@@ -8,7 +8,11 @@ import {
     fetchWithRetry,
     getWebsiteMap,
     parseUrlWithCache,
-    processWithGeminiCache
+    processWithGeminiCache,
+    // Добавляем новые функции
+    getWebsiteMapDirect,
+    parseUrl,
+    processWithGemini
 } from './api.js';
 
 // Реэкспортируем все функции и константы
@@ -21,7 +25,11 @@ export {
     fetchWithRetry,
     getWebsiteMap,
     parseUrlWithCache,
-    processWithGeminiCache
+    processWithGeminiCache,
+    // Добавляем новые функции
+    getWebsiteMapDirect,
+    parseUrl,
+    processWithGemini
 };
 
 console.log("API module loaded"); 

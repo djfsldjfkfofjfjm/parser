@@ -1,5 +1,4 @@
 // Реэкспорт утилит из модулей
-export { cacheManager, CACHE_EXPIRATION } from './cache-manager.js';
 export { safeGetTextContent, showProgress, hideProgress, switchTab, copyContent } from './ui-utils.js';
 
 // Импортируем и реэкспортируем treeHelper из новой модульной структуры

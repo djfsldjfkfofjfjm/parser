@@ -21,18 +21,6 @@ export function initUIHandlers(elements, getSelectedUrls) {
     elements.showProcessedBtn.addEventListener('click', () => switchTab(elements.showProcessedBtn, elements.processedResultsDiv));
     elements.showKnowledgeBaseBtn.addEventListener('click', () => switchTab(elements.showKnowledgeBaseBtn, elements.knowledgeBaseDiv));
     
-    // Обработчик кнопки очистки кэша
-    elements.clearCacheButton.addEventListener('click', () => {
-        if (confirm('Вы уверены, что хотите очистить весь кэш? Это удалит все сохраненные данные.')) {
-            const result = elements.cacheManager.clearAll();
-            if (result) {
-                alert('Кэш успешно очищен');
-            } else {
-                alert('Ошибка при очистке кэша');
-            }
-        }
-    });
-
     // Обработчик кнопки парсинга выбранных URL
     elements.parseSelectedBtn.addEventListener('click', async () => {
         console.log('Клик на кнопку "Анализировать выбранные"');

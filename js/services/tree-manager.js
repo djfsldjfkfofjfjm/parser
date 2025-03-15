@@ -1,5 +1,5 @@
 // Импортируем необходимые функции из других модулей
-import { getPageTitleWithCache, getBatchPageTitlesWithCache } from './page-title-service.js';
+import { getPageTitle, getBatchPageTitles } from './page-title-service.js';
 import { showProgress, hideProgress } from '../utils/index.js';
 import { treeHelper } from '../utils/index.js';
 
@@ -393,7 +393,7 @@ const updatePageTitles = async (selectedUrls, progressContainer, progressFill, p
         console.log('Запуск пакетного получения заголовков для всех URL');
         
         // Получаем заголовки для всех URL в пакетном режиме
-        const titleResults = await getBatchPageTitlesWithCache(selectedUrls, 10); // Оптимальный размер пакета
+        const titleResults = await getBatchPageTitles(selectedUrls, 10); // Оптимальный размер пакета
         
         console.log(`Получены заголовки для ${Object.keys(titleResults).length} URL, обновляем дерево`);
         

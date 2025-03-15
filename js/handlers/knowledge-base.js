@@ -3,7 +3,7 @@
  */
 
 import { showProgress, hideProgress, safeGetTextContent } from '../utils/index.js';
-import { processWithGeminiCache } from '../api/index.js';
+import { processWithGemini } from '../api/index.js';
 import { knowledgeBasePrompt } from '../prompts/index.js';
 
 /**
@@ -42,7 +42,7 @@ URL: ${url}
             'Отправка данных в Gemini для создания базы знаний...', 50);
 
         // Отправляем в Gemini для создания структурированной базы знаний
-        const knowledgeBase = await processWithGeminiCache('knowledgeBase', allProcessedContent, knowledgeBasePrompt);
+        const knowledgeBase = await processWithGemini('knowledgeBase', allProcessedContent, knowledgeBasePrompt);
 
         // Заменяем переносы строк HTML-тегами для отображения
         knowledgeBaseContent.innerHTML = knowledgeBase.replace(/\n/g, '<br>');

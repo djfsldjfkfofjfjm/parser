@@ -1,6 +1,5 @@
 // Импортируем необходимые функции и константы из других модулей
 import { 
-    cacheManager,
     safeGetTextContent, 
     showProgress, 
     hideProgress, 
@@ -14,10 +13,10 @@ import {
     FIRECRAWL_RATE_LIMIT,
     GEMINI_RATE_LIMIT,
     MINUTE, 
-    getWebsiteMap
+    getWebsiteMapDirect as getWebsiteMap
 } from './api/index.js';
 import { 
-    getPageTitleWithCache,
+    getPageTitle as getPageTitleWithCache,
     initializeTree,
     buildUrlTree
 } from './services/index.js';
@@ -80,8 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         processingDetails: document.getElementById('processing-progress')?.querySelector('.progress-details'),
         clearCacheButton: document.getElementById('clearCacheButton'),
         // Элемент может отсутствовать в текущей версии HTML
-        promptEditorContainer: document.getElementById('prompt-editor-container'),
-        cacheManager
+        promptEditorContainer: document.getElementById('prompt-editor-container')
     };
 
     // Инициализация промптов

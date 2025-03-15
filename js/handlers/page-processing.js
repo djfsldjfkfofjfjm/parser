@@ -3,7 +3,7 @@
  */
 
 import { showProgress, hideProgress, safeGetTextContent } from '../utils/index.js';
-import { parseUrlWithCache, processWithGeminiCache } from '../api/index.js';
+import { parseUrl, processWithGemini } from '../api/index.js';
 import { extractionPrompt } from '../prompts/index.js';
 import { FIRECRAWL_RATE_LIMIT, MINUTE } from '../api/index.js';
 
@@ -54,7 +54,7 @@ export async function parseUrl(url, parsingResultsDiv, updateProgress, totalUrls
             return { processed, errors, success: false };
         }
         
-        const data = await parseUrlWithCache(url);
+        const data = await parseUrl(url);
         const markdownContent = data.data?.markdown || 'Не удалось получить контент';
 
         const resultBlock = document.createElement('div');
@@ -171,14 +171,26 @@ export async function processContentWithGemini(resultBlocks, processingProgress,
             `Обработано ${processedCount} из ${totalCount} страниц (ошибок: ${errorCount})`);
     };
     
-    // Разбиваем блоки на группы с учетом лимита Gemini API
-    const CHUNK_SIZE = 3; // Меньший размер группы для снижения вероятности ошибок
+    // Количество страниц, обрабатываемых за один запрос к Gemini
+    const PAGES_PER_REQUEST = 7;
+    
+    // Количество параллельных запросов
+    const CHUNK_SIZE = 3;
+    
     const DELAY_BЕТWEEN_CHUNKS = MINUTE / GEMINI_RATE_LIMIT * CHUNK_SIZE;
     
     const blocksArray = Array.from(resultBlocks);
+    
+    // Разбиваем на группы по 7 страниц
+    const pageGroups = [];
+    for (let i = 0; i < blocksArray.length; i += PAGES_PER_REQUEST) {
+        pageGroups.push(blocksArray.slice(i, i + PAGES_PER_REQUEST));
+    }
+    
+    // Разбиваем группы на чанки для параллельной обработки
     const chunks = [];
-    for (let i = 0; i < blocksArray.length; i += CHUNK_SIZE) {
-        chunks.push(blocksArray.slice(i, i + CHUNK_SIZE));
+    for (let i = 0; i < pageGroups.length; i += CHUNK_SIZE) {
+        chunks.push(pageGroups.slice(i, i + CHUNK_SIZE));
     }
 
     // Обрабатываем каждую группу с задержкой
@@ -195,52 +207,113 @@ export async function processContentWithGemini(resultBlocks, processingProgress,
             await new Promise(resolve => setTimeout(resolve, DELAY_BЕТWEEN_CHUNKS));
         }
 
-        // Обрабатываем текущую группу блоков
-        await Promise.all(chunk.map(async (block) => {
+        // Обрабатываем текущую группу блоков (каждая группа - это до 7 страниц)
+        await Promise.all(chunk.map(async (pageGroup) => {
             try {
-                // Безопасное получение URL и контента
-                const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
-                const content = safeGetTextContent(block, 'pre', '');
-                
-                if (!content || content === 'Не удалось получить контент') {
-                    console.warn(`Пустой контент для URL: ${url}`);
-                    const errorBlock = document.createElement('div');
-                    errorBlock.className = 'processed-result warning';
-                    errorBlock.innerHTML = `
+                // Если в группе только одна страница, обрабатываем ее как раньше
+                if (pageGroup.length === 1) {
+                    const block = pageGroup[0];
+                    const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
+                    const content = safeGetTextContent(block, 'pre', '');
+                    
+                    if (!content || content === 'Не удалось получить контент') {
+                        console.warn(`Пустой контент для URL: ${url}`);
+                        const errorBlock = document.createElement('div');
+                        errorBlock.className = 'processed-result warning';
+                        errorBlock.innerHTML = `
+                            <h3>${url}</h3>
+                            <pre>Нет данных для обработки</pre>
+                        `;
+                        processedResultsDiv.appendChild(errorBlock);
+                        processed++;
+                        updateProgress(processed, totalBlocks, errors);
+                        return;
+                    }
+
+                    const extractedText = await processWithGemini(url, content, extractionPrompt);
+
+                    const processedBlock = document.createElement('div');
+                    processedBlock.className = 'processed-result';
+                    processedBlock.innerHTML = `
                         <h3>${url}</h3>
-                        <pre>Нет данных для обработки</pre>
+                        <pre>${extractedText}</pre>
                     `;
-                    processedResultsDiv.appendChild(errorBlock);
+                    processedResultsDiv.appendChild(processedBlock);
+
                     processed++;
                     updateProgress(processed, totalBlocks, errors);
                     return;
                 }
-
-                const extractedText = await processWithGeminiCache(url, content, extractionPrompt);
-
-                const processedBlock = document.createElement('div');
-                processedBlock.className = 'processed-result';
-                processedBlock.innerHTML = `
-                    <h3>${url}</h3>
-                    <pre>${extractedText}</pre>
-                `;
-                processedResultsDiv.appendChild(processedBlock);
-
-                processed++;
+                
+                // Объединяем контент нескольких страниц в один запрос
+                let combinedContent = '';
+                const pagesInfo = [];
+                
+                // Собираем информацию о каждой странице в группе
+                pageGroup.forEach(block => {
+                    const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
+                    const content = safeGetTextContent(block, 'pre', '');
+                    
+                    if (!content || content === 'Не удалось получить контент') {
+                        console.warn(`Пустой контент для URL: ${url}`);
+                        const errorBlock = document.createElement('div');
+                        errorBlock.className = 'processed-result warning';
+                        errorBlock.innerHTML = `
+                            <h3>${url}</h3>
+                            <pre>Нет данных для обработки</pre>
+                        `;
+                        processedResultsDiv.appendChild(errorBlock);
+                        processed++;
+                        return;
+                    }
+                    
+                    // Добавляем страницу в общий контент
+                    combinedContent += `\n\n--- СТРАНИЦА: ${url} ---\n${content}`;
+                    pagesInfo.push({ url, block, hasContent: true });
+                });
+                
+                // Если после фильтрации пустого контента ничего не осталось, прекращаем обработку
+                if (combinedContent === '') {
+                    updateProgress(processed, totalBlocks, errors);
+                    return;
+                }
+                
+                // Отправляем один запрос с контентом всех страниц
+                const groupKey = pagesInfo.map(p => p.url).join('_');
+                const extractedText = await processWithGemini(groupKey, combinedContent, extractionPrompt);
+                
+                // Применяем результат ко всем страницам в группе
+                pagesInfo.forEach(pageInfo => {
+                    if (!pageInfo.hasContent) return;
+                    
+                    const processedBlock = document.createElement('div');
+                    processedBlock.className = 'processed-result';
+                    processedBlock.innerHTML = `
+                        <h3>${pageInfo.url}</h3>
+                        <pre>${extractedText}</pre>
+                    `;
+                    processedResultsDiv.appendChild(processedBlock);
+                    processed++;
+                });
+                
                 updateProgress(processed, totalBlocks, errors);
 
             } catch (error) {
                 console.error('Ошибка обработки через Gemini:', error);
-                const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
-                const errorBlock = document.createElement('div');
-                errorBlock.className = 'processed-result error';
-                errorBlock.innerHTML = `
-                    <h3>${url}</h3>
-                    <p>Ошибка обработки: ${error.message}</p>
-                `;
-                processedResultsDiv.appendChild(errorBlock);
-                errors++;
-                processed++;
+                
+                // В случае ошибки отмечаем все страницы в группе как обработанные с ошибкой
+                pageGroup.forEach(block => {
+                    const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
+                    const errorBlock = document.createElement('div');
+                    errorBlock.className = 'processed-result error';
+                    errorBlock.innerHTML = `
+                        <h3>${url}</h3>
+                        <p>Ошибка обработки: ${error.message}</p>
+                    `;
+                    processedResultsDiv.appendChild(errorBlock);
+                    errors++;
+                    processed++;
+                });
                 
                 updateProgress(processed, totalBlocks, errors);
             }

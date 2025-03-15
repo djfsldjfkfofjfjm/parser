@@ -1,5 +1,4 @@
 // Импортируем необходимые функции и константы из других модулей
-import { cacheManager } from '../utils/index.js';
 import { fetchWithRetry } from '../api/index.js';
 import { extractTitleFromHTML, createTitleFromURL } from './title-extractor.js';
 
@@ -105,5 +104,54 @@ const getBatchPageTitlesWithCache = async (urls, batchSize = 10) => {
     return results;
 };
 
-// Экспортируем функцию
-export { getPageTitleWithCache, getBatchPageTitlesWithCache };
+// Получение заголовка страницы без кэширования
+const getPageTitle = async (url) => {
+    console.log(`Запрос заголовка для URL: ${url}`);
+    
+    try {
+        // Создаем заголовок из URL
+        const title = createTitleFromURL(url);
+        console.log(`Создан заголовок из URL: "${title}"`);
+        
+        return title;
+    } catch (error) {
+        console.error(`Ошибка при получении заголовка для ${url}:`, error);
+        return url.split('/').pop() || url;
+    }
+};
+
+// Получение заголовков страниц в пакетном режиме без кэширования
+const getBatchPageTitles = async (urls, batchSize = 10) => {
+    console.log(`Запрос заголовков для ${urls.length} URL в пакетном режиме`);
+    
+    const results = {};
+    
+    const batches = [];
+    for (let i = 0; i < urls.length; i += batchSize) {
+        batches.push(urls.slice(i, i + batchSize));
+    }
+    
+    // Обрабатываем каждую группу URL
+    for (const batch of batches) {
+        await Promise.all(batch.map(async (url) => {
+            try {
+                const title = await getPageTitle(url);
+                results[url] = title;
+            } catch (error) {
+                console.error(`Ошибка получения заголовка для ${url}:`, error);
+                results[url] = url;
+            }
+        }));
+    }
+    
+    return results;
+};
+
+// Экспортируем функции
+export { 
+    getPageTitleWithCache, 
+    getBatchPageTitlesWithCache,
+    // Добавляем новые функции
+    getPageTitle,
+    getBatchPageTitles
+};
