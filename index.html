@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Веб-парсер</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/themes/default/style.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jstree/3.3.12/jstree.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Веб-парсер</h1>
+
+        <!-- Прогресс-бары -->
+        <div class="progress-bars">
+            <!-- Основной прогресс-бар -->
+            <div id="progress" class="progress-bar-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <div class="progress-text">Загрузка...</div>
+                    <div class="progress-details"></div>
+                </div>
+            </div>
+
+            <!-- Прогресс-бар обработки -->
+            <div id="processing-progress" class="progress-bar-container" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <div class="progress-text">Обработка...</div>
+                    <div class="progress-details"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основной блок ввода -->
+        <div class="input-block">
+            <div class="url-input">
+                <input type="url" id="websiteUrl" placeholder="Введите URL сайта">
+                <button id="startButton">Начать</button>
+                <button id="clearCacheButton" class="clear-button">Очистить кэш</button>
+            </div>
+        </div>
+
+        <!-- Блок выбора страниц -->
+        <div id="pageSelection" class="selection-block" style="display: none;">
+            <h2>Выберите страницы для анализа</h2>
+            
+            <div class="selection-content">
+                <!-- Search box -->
+                <div class="search-box">
+                    <input type="text" id="pagesSearch" placeholder="Поиск страниц...">
+                </div>
+                
+                <!-- Tree container with fixed height -->
+                <div class="tree-container">
+                    <div id="pagesTree"></div>
+                </div>
+                
+                <!-- Add a small info section somewhere appropriate, like before or after the tree -->
+                <div class="page-selection-info" style="margin: 10px 0; padding: 8px; background-color: #e3f2fd; border-radius: 4px; font-size: 13px;">
+                    <div><strong>💡 Подсказка:</strong> Категории с синим текстом и значком 📄 также доступны для парсинга.</div>
+                </div>
+                
+                <!-- Controls -->
+                <div class="selection-controls">
+                    <div class="quick-filters">
+                        <button id="selectAll" class="control-button">Выбрать все</button>
+                        <button id="selectHomepage" class="control-button">Выбрать главную</button>
+                        <button id="deselectAll" class="control-button">Снять выбор</button>
+                    </div>
+                    
+                    <button id="parseSelected" class="primary-button">Анализировать выбранные</button>
+                    <button id="debugSelections" class="clear-button" style="margin-left: 10px;">Показать выбранные</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок результатов -->
+        <div id="results" class="results-block" style="display: none;">
+            <h2>Результаты анализа</h2>
+            
+            <!-- Панель управления -->
+            <div class="control-panel">
+                <div class="action-buttons">
+                    <button id="processWithGemini" class="primary-button">Обработать через Gemini</button>
+                    <button id="createKnowledgeBase" class="primary-button">Создать базу знаний</button>
+                    <div class="copy-buttons">
+                        <div class="button-group">
+                            <button id="copyRawResults">Копировать исходный текст</button>
+                            <button id="clearRawResults" class="clear-button">Очистить</button>
+                        </div>
+                        <div class="button-group">
+                            <button id="copyProcessedResults">Копировать обработанный текст</button>
+                            <button id="clearProcessedResults" class="clear-button">Очистить</button>
+                        </div>
+                        <div class="button-group">
+                            <button id="copyKnowledgeBase">Копировать базу знаний</button>
+                            <button id="clearKnowledgeBase" class="clear-button">Очистить</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Табы с результатами -->
+            <div class="results-tabs">
+                <button id="showRawBtn" class="tab-btn active">Исходный текст</button>
+                <button id="showProcessedBtn" class="tab-btn">Обработанная информация</button>
+                <button id="showKnowledgeBaseBtn" class="tab-btn">База знаний</button>
+            </div>
+
+            <!-- Контент табов -->
+            <div id="parsing-results" class="tab-content active"></div>
+            <div id="processed-results" class="tab-content"></div>
+            <div id="knowledge-base" class="tab-content">
+                <div class="knowledge-base-content"></div>
+            </div>
+        </div>
+        
+        <!-- Контейнер для редактора промптов -->
+        <div id="prompt-editor-container" class="prompt-editor-container" style="display: none;">
+            <!-- Контент будет добавлен динамически через JavaScript -->
+        </div>
+    </div>
+
+    <!-- Подключаем переменные окружения -->
+    <script src="/api/env.js"></script>
+    
+    <!-- Подключаем основной скрипт как ES модуль -->
+    <script type="module" src="js/main.js"></script>
+    <!-- Подключаем debug.js только в режиме отладки -->
+    <script>
+        // Проверяем наличие параметра debug в URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('debug')) {
+            const debugScript = document.createElement('script');
+            debugScript.src = 'js/utils/debug.js';
+            document.body.appendChild(debugScript);
+            console.log('Debug mode активирован');
+        }
+    </script>
+    <script>
+        document.getElementById('debugSelections').addEventListener('click', function() {
+            const tree = $('#pagesTree').jstree(true);
+            if (!tree) {
+                alert('Дерево не инициализировано');
+                return;
+            }
+            
+            try {
+                // Использовать функцию из treeHelper для получения URL
+                if (window.treeHelper && typeof window.treeHelper.getSelectedUrls === 'function') {
+                    const selectedUrls = window.treeHelper.getSelectedUrls();
+                    let message = 'Выбрано URL: ' + selectedUrls.length + ':\n\n';
+                    selectedUrls.forEach((url, index) => {
+                        message += (index + 1) + '. ' + url + '\n';
+                    });
+                    alert(message);
+                    return;
+                }
+                
+                // Запасной вариант
+                const selectedNodes = tree.get_selected(true);
+                let message = 'Выбрано ' + selectedNodes.length + ' элементов:\n\n';
+                
+                selectedNodes.forEach(node => {
+                    let url = 'URL не найден';
+                    
+                    // Проверяем все возможные места хранения URL
+                    if (node.li_attr && node.li_attr['data-url']) {
+                        url = node.li_attr['data-url'];
+                    } else if (node.a_attr && node.a_attr.href && node.a_attr.href !== '#') {
+                        url = node.a_attr.href;
+                    } else if (node.original && node.original.url) {
+                        url = node.original.url;
+                    } else if (node.data && node.data.url) {
+                        url = node.data.url;
+                    }
+                    
+                    message += node.text + ' (' + url + ')\n';
+                });
+                
+                alert(message);
+            } catch (error) {
+                alert('Ошибка при получении выбранных элементов: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

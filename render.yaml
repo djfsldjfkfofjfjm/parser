@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: web-parser-app
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
