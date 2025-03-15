@@ -18,7 +18,7 @@ import { FIRECRAWL_RATE_LIMIT, MINUTE } from '../api/index.js';
  * @param {number} errors - Количество ошибок при обработке
  * @returns {Object} - Объект с обновленными счетчиками и флагом успешности
  */
-export async function parseUrl(url, parsingResultsDiv, updateProgress, totalUrls, processed, errors) {
+export async function parseUrlPage(url, parsingResultsDiv, updateProgress, totalUrls, processed, errors) {
     try {
         // Специальная обработка для URL главной страницы
         if (url === window.crawlResults?.baseUrl) {
@@ -131,7 +131,7 @@ export async function parseSelectedUrls(selectedUrls, progressContainer, progres
         }
 
         // Обрабатываем текущую группу URL
-        const results = await Promise.all(chunk.map(url => parseUrl(url, parsingResultsDiv, updateProgress, totalUrls, processed, errors)));
+        const results = await Promise.all(chunk.map(url => parseUrlPage(url, parsingResultsDiv, updateProgress, totalUrls, processed, errors)));
         
         // Обновляем счетчики
         processed = results.reduce((acc, result) => result.processed > acc ? result.processed : acc, processed);
@@ -210,42 +210,7 @@ export async function processContentWithGemini(resultBlocks, processingProgress,
         // Обрабатываем текущую группу блоков (каждая группа - это до 7 страниц)
         await Promise.all(chunk.map(async (pageGroup) => {
             try {
-                // Если в группе только одна страница, обрабатываем ее как раньше
-                if (pageGroup.length === 1) {
-                    const block = pageGroup[0];
-                    const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
-                    const content = safeGetTextContent(block, 'pre', '');
-                    
-                    if (!content || content === 'Не удалось получить контент') {
-                        console.warn(`Пустой контент для URL: ${url}`);
-                        const errorBlock = document.createElement('div');
-                        errorBlock.className = 'processed-result warning';
-                        errorBlock.innerHTML = `
-                            <h3>${url}</h3>
-                            <pre>Нет данных для обработки</pre>
-                        `;
-                        processedResultsDiv.appendChild(errorBlock);
-                        processed++;
-                        updateProgress(processed, totalBlocks, errors);
-                        return;
-                    }
-
-                    const extractedText = await processWithGemini(url, content, extractionPrompt);
-
-                    const processedBlock = document.createElement('div');
-                    processedBlock.className = 'processed-result';
-                    processedBlock.innerHTML = `
-                        <h3>${url}</h3>
-                        <pre>${extractedText}</pre>
-                    `;
-                    processedResultsDiv.appendChild(processedBlock);
-
-                    processed++;
-                    updateProgress(processed, totalBlocks, errors);
-                    return;
-                }
-                
-                // Объединяем контент нескольких страниц в один запрос
+                // ВСЕГДА объединяем контент страниц в группе
                 let combinedContent = '';
                 const pagesInfo = [];
                 
@@ -278,8 +243,9 @@ export async function processContentWithGemini(resultBlocks, processingProgress,
                     return;
                 }
                 
-                // Отправляем один запрос с контентом всех страниц
-                const groupKey = pagesInfo.map(p => p.url).join('_');
+                // Отправляем один запрос с контентом всех страниц в группе
+                const groupKey = pagesInfo.map(p => p.url).join('_').substring(0, 50) + '...';
+                console.log(`Отправляем группу из ${pagesInfo.length} страниц в одном запросе`);
                 const extractedText = await processWithGemini(groupKey, combinedContent, extractionPrompt);
                 
                 // Применяем результат ко всем страницам в группе

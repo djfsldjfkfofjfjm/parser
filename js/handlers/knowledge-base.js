@@ -61,6 +61,9 @@ URL: ${url}
         showProgress(processingProgress, processingFill, processingText, processingDetails,
             'Отправка данных в Gemini для создания базы знаний...', 50);
 
+        // Вывод размера контента для диагностики
+        console.log(`Отправка базы знаний в Gemini, размер контента: ${allProcessedContent.length} символов, ${Array.from(processedBlocks).length} блоков`);
+            
         // Безопасный вызов Gemini API
         let knowledgeBase;
         try {
