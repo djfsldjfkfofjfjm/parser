@@ -77,7 +77,10 @@ export function initUIHandlers(elements, getSelectedUrls) {
     });
 
     // Обработчик кнопки создания базы знаний
-    elements.createKnowledgeBaseBtn.addEventListener('click', async () => {
+    elements.createKnowledgeBaseBtn.addEventListener('click', async (event) => {
+        // Явно предотвращаем стандартное поведение, которое может вызывать перезагрузку
+        event.preventDefault();
+        
         const processedBlocks = elements.processedResultsDiv.querySelectorAll('.processed-result');
         if (processedBlocks.length === 0) {
             alert('Сначала обработайте страницы через Gemini.');

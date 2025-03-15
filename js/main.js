@@ -41,6 +41,34 @@ console.log("Main module loaded");
 
 // Ждем загрузку DOM
 document.addEventListener('DOMContentLoaded', () => {
+    // Глобальные обработчики ошибок
+    window.addEventListener('error', function(event) {
+        console.error('Глобальная ошибка:', event.error);
+        event.preventDefault();
+        return false; // Предотвращает стандартную обработку ошибок браузера
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Необработанное отклонение промиса:', event.reason);
+        event.preventDefault();
+    });
+
+    // Предотвращаем отправку форм, которая может вызывать перезагрузку страницы
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            console.log('Предотвращена отправка формы');
+        });
+    });
+
+    // Убеждаемся, что все кнопки имеют type="button", а не type="submit"
+    document.querySelectorAll('button').forEach(button => {
+        if (!button.type || button.type === 'submit') {
+            button.type = 'button';
+            console.log('Изменен тип кнопки на button:', button.id || 'безымянная кнопка');
+        }
+    });
+
     // DOM элементы
     const elements = {
         websiteUrlInput: document.getElementById('websiteUrl'),

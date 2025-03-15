@@ -22,37 +22,104 @@ export async function createKnowledgeBase(processedBlocks, processingProgress, p
         'Создание базы знаний...', 0);
 
     try {
-        // Собираем контент со всех обработанных блоков
+        // Проверка входных параметров
+        if (!processedBlocks || !Array.from(processedBlocks).length) {
+            console.error('Нет данных для создания базы знаний');
+            knowledgeBaseContent.textContent = 'Нет данных для создания базы знаний. Пожалуйста, сначала обработайте страницы.';
+            hideProgress(processingProgress);
+            return null;
+        }
+        
+        // Безопасное извлечение контента
         const allProcessedContent = Array.from(processedBlocks)
             .map(block => {
-                const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
-                const content = safeGetTextContent(block, 'pre', '');
-                if (!content) return '';
-                return `
+                try {
+                    const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
+                    const content = safeGetTextContent(block, 'pre', '');
+                    if (!content) return '';
+                    return `
 URL: ${url}
 Информация: ${content}
 -------------------
 `;
+                } catch (e) {
+                    console.error('Ошибка при обработке блока:', e);
+                    return '';
+                }
             })
             .filter(content => content)
             .join('\n');
+            
+        if (!allProcessedContent.trim()) {
+            console.error('Нет данных для отправки в Gemini');
+            knowledgeBaseContent.textContent = 'Не удалось собрать данные для базы знаний.';
+            hideProgress(processingProgress);
+            return null;
+        }
 
-        // Показываем прогресс перед отправкой запроса к Gemini
+        // Показываем прогресс перед отправкой запроса
         showProgress(processingProgress, processingFill, processingText, processingDetails,
             'Отправка данных в Gemini для создания базы знаний...', 50);
 
-        // Отправляем в Gemini для создания структурированной базы знаний
-        const knowledgeBase = await processWithGemini('knowledgeBase', allProcessedContent, knowledgeBasePrompt);
+        // Безопасный вызов Gemini API
+        let knowledgeBase;
+        try {
+            knowledgeBase = await processWithGemini('knowledgeBase', allProcessedContent, knowledgeBasePrompt);
+            
+            // Проверка результата
+            if (!knowledgeBase || typeof knowledgeBase !== 'string' || knowledgeBase.startsWith('Ошибка')) {
+                console.error('Получена ошибка от Gemini API:', knowledgeBase);
+                knowledgeBaseContent.textContent = knowledgeBase || 'Ошибка при создании базы знаний';
+                hideProgress(processingProgress);
+                return null;
+            }
+        } catch (geminiError) {
+            console.error('Ошибка при обработке через Gemini:', geminiError);
+            knowledgeBaseContent.textContent = 'Произошла ошибка при обработке данных через Gemini';
+            hideProgress(processingProgress);
+            return null;
+        }
 
-        // Заменяем переносы строк HTML-тегами для отображения
-        knowledgeBaseContent.innerHTML = knowledgeBase.replace(/\n/g, '<br>');
+        // Безопасное обновление DOM
+        try {
+            // Ограничение размера для предотвращения проблем с DOM
+            const MAX_HTML_SIZE = 1000000;
+            if (knowledgeBase.length > MAX_HTML_SIZE) {
+                knowledgeBase = knowledgeBase.substring(0, MAX_HTML_SIZE) + '... (Текст был сокращен из-за большого размера)';
+            }
+            
+            // Безопасное обновление HTML
+            knowledgeBaseContent.innerHTML = '';  // Сначала очищаем
+            knowledgeBaseContent.textContent = knowledgeBase;  // Используем textContent для безопасности
+            
+            // Затем делаем замену переносов строк на <br>
+            knowledgeBaseContent.innerHTML = knowledgeBaseContent.textContent.replace(/\n/g, '<br>');
+        } catch (domError) {
+            console.error('Ошибка при обновлении DOM:', domError);
+            
+            // Попытка использовать более безопасный метод
+            try {
+                knowledgeBaseContent.textContent = 'Не удалось отобразить результат целиком. Текст базы знаний: ' + 
+                    knowledgeBase.substring(0, 10000) + '... (сокращено)';
+            } catch (e) {
+                knowledgeBaseContent.textContent = 'Ошибка отображения результата.';
+            }
+        }
         
         hideProgress(processingProgress);
         return knowledgeBase;
 
     } catch (error) {
-        console.error('Ошибка создания базы знаний:', error);
+        console.error('Критическая ошибка создания базы знаний:', error);
         hideProgress(processingProgress);
+        
+        // Безопасное обновление DOM
+        try {
+            knowledgeBaseContent.textContent = 'Произошла ошибка при создании базы знаний: ' + error.message;
+        } catch (e) {
+            console.error('Не удалось обновить DOM после ошибки:', e);
+        }
+        
         return null;
     }
 }

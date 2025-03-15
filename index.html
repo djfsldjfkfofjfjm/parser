@@ -42,7 +42,7 @@
         <div class="input-block">
             <div class="url-input">
                 <input type="url" id="websiteUrl" placeholder="Введите URL сайта">
-                <button id="startButton">Начать</button>
+                <button id="startButton" type="button">Начать</button>
             </div>
         </div>
 
@@ -69,13 +69,13 @@
                 <!-- Controls -->
                 <div class="selection-controls">
                     <div class="quick-filters">
-                        <button id="selectAll" class="control-button">Выбрать все</button>
-                        <button id="selectHomepage" class="control-button">Выбрать главную</button>
-                        <button id="deselectAll" class="control-button">Снять выбор</button>
+                        <button id="selectAll" type="button" class="control-button">Выбрать все</button>
+                        <button id="selectHomepage" type="button" class="control-button">Выбрать главную</button>
+                        <button id="deselectAll" type="button" class="control-button">Снять выбор</button>
                     </div>
                     
-                    <button id="parseSelected" class="primary-button">Анализировать выбранные</button>
-                    <button id="debugSelections" class="clear-button" style="margin-left: 10px;">Показать выбранные</button>
+                    <button id="parseSelected" type="button" class="primary-button">Анализировать выбранные</button>
+                    <button id="debugSelections" type="button" class="clear-button" style="margin-left: 10px;">Показать выбранные</button>
                 </div>
             </div>
         </div>
@@ -87,20 +87,20 @@
             <!-- Панель управления -->
             <div class="control-panel">
                 <div class="action-buttons">
-                    <button id="processWithGemini" class="primary-button">Обработать через Gemini</button>
-                    <button id="createKnowledgeBase" class="primary-button">Создать базу знаний</button>
+                    <button id="processWithGemini" type="button" class="primary-button">Обработать через Gemini</button>
+                    <button id="createKnowledgeBase" type="button" class="primary-button">Создать базу знаний</button>
                     <div class="copy-buttons">
                         <div class="button-group">
-                            <button id="copyRawResults">Копировать исходный текст</button>
-                            <button id="clearRawResults" class="clear-button">Очистить</button>
+                            <button id="copyRawResults" type="button">Копировать исходный текст</button>
+                            <button id="clearRawResults" type="button" class="clear-button">Очистить</button>
                         </div>
                         <div class="button-group">
-                            <button id="copyProcessedResults">Копировать обработанный текст</button>
-                            <button id="clearProcessedResults" class="clear-button">Очистить</button>
+                            <button id="copyProcessedResults" type="button">Копировать обработанный текст</button>
+                            <button id="clearProcessedResults" type="button" class="clear-button">Очистить</button>
                         </div>
                         <div class="button-group">
-                            <button id="copyKnowledgeBase">Копировать базу знаний</button>
-                            <button id="clearKnowledgeBase" class="clear-button">Очистить</button>
+                            <button id="copyKnowledgeBase" type="button">Копировать базу знаний</button>
+                            <button id="clearKnowledgeBase" type="button" class="clear-button">Очистить</button>
                         </div>
                     </div>
                 </div>
@@ -130,6 +130,36 @@
     <!-- Подключаем переменные окружения -->
     <script src="/api/env.js"></script>
     
+    <!-- Глобальный обработчик для предотвращения отправки форм -->
+    <script>
+        // Предотвращаем отправку любых форм на странице
+        document.addEventListener('DOMContentLoaded', function() {
+            // Все существующие формы
+            document.querySelectorAll('form').forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    console.log('Предотвращена отправка формы');
+                    e.preventDefault();
+                });
+            });
+            
+            // Динамически проверяем все кнопки
+            document.querySelectorAll('button').forEach(function(button) {
+                if (!button.hasAttribute('type') || button.getAttribute('type') === 'submit') {
+                    console.log('Изменен тип кнопки на button:', button.id || 'безымянная кнопка');
+                    button.setAttribute('type', 'button');
+                }
+            });
+            
+            // Отслеживаем события клика на кнопках
+            document.addEventListener('click', function(e) {
+                if (e.target.tagName === 'BUTTON') {
+                    // Для всех кнопок предотвращаем действие по умолчанию
+                    e.preventDefault();
+                }
+            }, true);
+        });
+    </script>
+    
     <!-- Подключаем основной скрипт как ES модуль -->
     <script type="module" src="js/main.js"></script>
     <!-- Подключаем debug.js только в режиме отладки -->
@@ -144,7 +174,10 @@
         }
     </script>
     <script>
-        document.getElementById('debugSelections').addEventListener('click', function() {
+        document.getElementById('debugSelections').addEventListener('click', function(event) {
+            // Предотвращаем стандартное поведение клика, которое может вызывать отправку формы
+            event.preventDefault();
+            
             const tree = $('#pagesTree').jstree(true);
             if (!tree) {
                 alert('Дерево не инициализировано');
