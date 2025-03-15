@@ -3,7 +3,9 @@
 // Из page-title-service.js
 export { 
     getPageTitleWithCache,
-    getBatchPageTitlesWithCache
+    getBatchPageTitlesWithCache,
+    getPageTitle,
+    getBatchPageTitles
 } from './page-title-service.js';
 
 // Из tree-manager.js
