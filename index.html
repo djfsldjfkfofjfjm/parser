@@ -89,18 +89,22 @@
                 <div class="action-buttons">
                     <button id="processWithGemini" type="button" class="primary-button">Обработать через Gemini</button>
                     <button id="createKnowledgeBase" type="button" class="primary-button">Создать базу знаний</button>
+                    <button id="togglePromptEditor" type="button" class="special-button" style="margin-left: auto;">Редактировать промпты</button>
                     <div class="copy-buttons">
                         <div class="button-group">
                             <button id="copyRawResults" type="button">Копировать исходный текст</button>
                             <button id="clearRawResults" type="button" class="clear-button">Очистить</button>
+                            <button id="downloadRawResults" type="button" class="download-button">Скачать TXT</button>
                         </div>
                         <div class="button-group">
                             <button id="copyProcessedResults" type="button">Копировать обработанный текст</button>
                             <button id="clearProcessedResults" type="button" class="clear-button">Очистить</button>
+                            <button id="downloadProcessedResults" type="button" class="download-button">Скачать TXT</button>
                         </div>
                         <div class="button-group">
                             <button id="copyKnowledgeBase" type="button">Копировать базу знаний</button>
                             <button id="clearKnowledgeBase" type="button" class="clear-button">Очистить</button>
+                            <button id="downloadKnowledgeBase" type="button" class="download-button">Скачать TXT</button>
                         </div>
                     </div>
                 </div>
@@ -123,7 +127,12 @@
         
         <!-- Контейнер для редактора промптов -->
         <div id="prompt-editor-container" class="prompt-editor-container" style="display: none;">
-            <!-- Контент будет добавлен динамически через JavaScript -->
+            <div class="prompt-editor-header">
+                <h2>Редактор промптов Gemini</h2>
+                <p class="prompt-editor-description">Отредактируйте промпты, которые отправляются в Gemini API вместе с контентом. После редактирования вы можете сохранить изменения и применить новые промпты.</p>
+                <button id="closePromptEditor" class="close-button">✕</button>
+            </div>
+            <div id="prompt-editors-content"></div>
         </div>
     </div>
 

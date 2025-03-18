@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
         processingText: document.getElementById('processing-progress')?.querySelector('.progress-text'),
         processingDetails: document.getElementById('processing-progress')?.querySelector('.progress-details'),
         clearCacheButton: document.getElementById('clearCacheButton'),
+        togglePromptEditorBtn: document.getElementById('togglePromptEditor'),
+        closePromptEditorBtn: document.getElementById('closePromptEditor'),
         // Элемент может отсутствовать в текущей версии HTML
         promptEditorContainer: document.getElementById('prompt-editor-container')
     };

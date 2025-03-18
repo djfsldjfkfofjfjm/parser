@@ -167,6 +167,25 @@ button:hover {
     background-color: #c0392b;
 }
 
+/* Специальная кнопка для редактора промптов */
+.special-button {
+    background-color: #9b59b6;
+    font-weight: 500;
+}
+
+.special-button:hover {
+    background-color: #8e44ad;
+}
+
+/* Кнопка скачивания */
+.download-button {
+    background-color: #f39c12;
+}
+
+.download-button:hover {
+    background-color: #d35400;
+}
+
 /* Панель управления */
 .control-panel {
     background: #f8f9fa;
@@ -178,8 +197,10 @@ button:hover {
 
 .action-buttons {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 10px;
+    align-items: center;
 }
 
 .copy-buttons {
@@ -210,6 +231,115 @@ button:hover {
     background-color: #7f8c8d;
 }
 
+/* Редактор промптов */
+.prompt-editor-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.3s ease-in-out;
+    overflow-y: auto;
+}
+
+.prompt-editor-container > div {
+    background-color: white;
+    width: calc(100% - 40px);
+    max-width: 1000px;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-in-out;
+}
+
+.prompt-editor-header {
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+}
+
+.prompt-editor-description {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.close-button {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #777;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.close-button:hover {
+    color: #c0392b;
+    background: none;
+}
+
+.prompt-editor {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.prompt-editor:last-child {
+    border-bottom: none;
+}
+
+.prompt-editor h3 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.prompt-editor textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    margin-bottom: 10px;
+    resize: vertical;
+    font-size: 14px;
+}
+
+.prompt-editor textarea:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+.prompt-editor .button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.prompt-apply {
+    background-color: #f39c12;
+}
+
+.prompt-apply:hover {
+    background-color: #d35400;
+}
+
+#prompt-editors-content {
+    max-height: calc(90vh - 100px);
+    overflow-y: auto;
+    padding: 0 20px 20px 20px;
+}
+
 /* Блок выбора страниц */
 .selection-block {
     margin: 20px 0;
@@ -235,6 +365,19 @@ button:hover {
 
 .category-filters button.active {
     background-color: #2ecc71;
+}
+
+/* Дерево страниц */
+.pages-tree-container {
+    margin-bottom: 15px;
+}
+
+#pagesSearchBox {
+    margin-bottom: 10px;
+}
+
+#pagesSearch {
+    width: 100%;
 }
 
 /* Дерево страниц */

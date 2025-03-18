@@ -5,6 +5,7 @@
 import { showProgress, hideProgress, safeGetTextContent } from '../utils/index.js';
 import { processWithGemini } from '../api/index.js';
 import { knowledgeBasePrompt } from '../prompts/index.js';
+import { GEMINI_RATE_LIMIT, MINUTE } from '../api/index.js';
 
 /**
  * Создает базу знаний на основе обработанного контента
@@ -30,8 +31,53 @@ export async function createKnowledgeBase(processedBlocks, processingProgress, p
             return null;
         }
         
-        // Безопасное извлечение контента
-        const allProcessedContent = Array.from(processedBlocks)
+        // Преобразуем NodeList в массив для работы с ним
+        const blocksArray = Array.from(processedBlocks);
+        
+        // Функция для обновления прогресса
+        const updateProgress = (processedCount, totalCount) => {
+            const progress = (processedCount / totalCount) * 100;
+            showProgress(processingProgress, processingFill, processingText, processingDetails,
+                'Создание базы знаний...', progress,
+                `Обработано ${processedCount} из ${totalCount} групп страниц`);
+        };
+        
+        // Количество страниц в одной группе
+        const PAGES_PER_GROUP = 10;
+        
+        // Количество параллельных запросов
+        const CHUNK_SIZE = 1;
+        
+        // Задержка между чанками запросов
+        const DELAY_BETWEEN_CHUNKS = MINUTE / GEMINI_RATE_LIMIT * CHUNK_SIZE;
+        
+        // Разбиваем на группы по PAGES_PER_GROUP страниц
+        const pageGroups = [];
+        for (let i = 0; i < blocksArray.length; i += PAGES_PER_GROUP) {
+            pageGroups.push(blocksArray.slice(i, i + PAGES_PER_GROUP));
+        }
+        
+        // Массив для хранения результатов обработки каждой группы
+        const groupResults = [];
+        let processed = 0;
+        const totalGroups = pageGroups.length;
+        
+        // Обрабатываем каждую группу последовательно с задержками
+        for (let i = 0; i < pageGroups.length; i++) {
+            const group = pageGroups[i];
+            
+            // Показываем сообщение о задержке, если это не первая группа
+            if (i > 0) {
+                const waitTime = Math.ceil(DELAY_BETWEEN_CHUNKS / 1000);
+                showProgress(processingProgress, processingFill, processingText, processingDetails,
+                    'Ожидание перед следующей группой запросов Gemini...', 
+                    (processed / totalGroups) * 100,
+                    `Пауза ${waitTime} секунд для соблюдения лимита запросов (${GEMINI_RATE_LIMIT} в минуту)`);
+                await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS));
+            }
+            
+            // Объединяем контент группы
+            const groupContent = group
             .map(block => {
                 try {
                     const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
@@ -50,50 +96,72 @@ URL: ${url}
             .filter(content => content)
             .join('\n');
             
-        if (!allProcessedContent.trim()) {
-            console.error('Нет данных для отправки в Gemini');
-            knowledgeBaseContent.textContent = 'Не удалось собрать данные для базы знаний.';
-            hideProgress(processingProgress);
-            return null;
+            if (!groupContent.trim()) {
+                console.warn(`Группа ${i+1} не содержит данных для обработки`);
+                processed++;
+                updateProgress(processed, totalGroups);
+                continue;
         }
 
         // Показываем прогресс перед отправкой запроса
         showProgress(processingProgress, processingFill, processingText, processingDetails,
-            'Отправка данных в Gemini для создания базы знаний...', 50);
+                `Отправка группы ${i+1} из ${totalGroups} в Gemini...`, 
+                (processed / totalGroups) * 100);
 
         // Вывод размера контента для диагностики
-        console.log(`Отправка базы знаний в Gemini, размер контента: ${allProcessedContent.length} символов, ${Array.from(processedBlocks).length} блоков`);
+            console.log(`Отправка группы ${i+1} из ${totalGroups} в Gemini, размер контента: ${groupContent.length} символов, ${group.length} блоков`);
             
         // Безопасный вызов Gemini API
-        let knowledgeBase;
         try {
-            knowledgeBase = await processWithGemini('knowledgeBase', allProcessedContent, knowledgeBasePrompt);
+                const groupResult = await processWithGemini(`knowledgeBaseGroup${i+1}`, groupContent, knowledgeBasePrompt);
             
             // Проверка результата
-            if (!knowledgeBase || typeof knowledgeBase !== 'string' || knowledgeBase.startsWith('Ошибка')) {
-                console.error('Получена ошибка от Gemini API:', knowledgeBase);
-                knowledgeBaseContent.textContent = knowledgeBase || 'Ошибка при создании базы знаний';
-                hideProgress(processingProgress);
-                return null;
+                if (!groupResult || typeof groupResult !== 'string' || groupResult.startsWith('Ошибка')) {
+                    console.error(`Получена ошибка от Gemini API для группы ${i+1}:`, groupResult);
+                    groupResults.push(`Группа ${i+1}: Ошибка обработки`);
+                } else {
+                    groupResults.push(groupResult);
             }
         } catch (geminiError) {
-            console.error('Ошибка при обработке через Gemini:', geminiError);
-            knowledgeBaseContent.textContent = 'Произошла ошибка при обработке данных через Gemini';
-            hideProgress(processingProgress);
-            return null;
+                console.error(`Ошибка при обработке группы ${i+1} через Gemini:`, geminiError);
+                groupResults.push(`Группа ${i+1}: ${geminiError.message || 'Ошибка обработки'}`);
+            }
+            
+            processed++;
+            updateProgress(processed, totalGroups);
         }
-
-        // Безопасное обновление DOM
-        try {
+        
+        // Объединяем результаты всех групп
+        let combinedKnowledgeBase = groupResults.join('\n\n');
+        
+        // Если есть более одной группы, делаем финальный запрос для объединения знаний
+        if (groupResults.length > 1) {
+            showProgress(processingProgress, processingFill, processingText, processingDetails,
+                'Финальное объединение базы знаний...', 90);
+                
+            // Ждем перед финальным запросом
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS));
+            
+            // Финальный запрос для объединения всех результатов
+            try {
+                const finalPrompt = `Объедини и структурируй следующие фрагменты базы знаний в единую согласованную базу знаний. Устрани повторения и противоречия. Сохрани всю важную информацию о продуктах, ценах и характеристиках:\n\n${combinedKnowledgeBase}`;
+                combinedKnowledgeBase = await processWithGemini('finalKnowledgeBase', combinedKnowledgeBase, finalPrompt);
+            } catch (finalError) {
+                console.error('Ошибка при финальном объединении базы знаний:', finalError);
+                // В случае ошибки оставляем простое объединение
+            }
+        }
+        
             // Ограничение размера для предотвращения проблем с DOM
             const MAX_HTML_SIZE = 1000000;
-            if (knowledgeBase.length > MAX_HTML_SIZE) {
-                knowledgeBase = knowledgeBase.substring(0, MAX_HTML_SIZE) + '... (Текст был сокращен из-за большого размера)';
+        if (combinedKnowledgeBase.length > MAX_HTML_SIZE) {
+            combinedKnowledgeBase = combinedKnowledgeBase.substring(0, MAX_HTML_SIZE) + '... (Текст был сокращен из-за большого размера)';
             }
             
             // Безопасное обновление HTML
+        try {
             knowledgeBaseContent.innerHTML = '';  // Сначала очищаем
-            knowledgeBaseContent.textContent = knowledgeBase;  // Используем textContent для безопасности
+            knowledgeBaseContent.textContent = combinedKnowledgeBase;  // Используем textContent для безопасности
             
             // Затем делаем замену переносов строк на <br>
             knowledgeBaseContent.innerHTML = knowledgeBaseContent.textContent.replace(/\n/g, '<br>');
@@ -103,14 +171,14 @@ URL: ${url}
             // Попытка использовать более безопасный метод
             try {
                 knowledgeBaseContent.textContent = 'Не удалось отобразить результат целиком. Текст базы знаний: ' + 
-                    knowledgeBase.substring(0, 10000) + '... (сокращено)';
+                    combinedKnowledgeBase.substring(0, 10000) + '... (сокращено)';
             } catch (e) {
                 knowledgeBaseContent.textContent = 'Ошибка отображения результата.';
             }
         }
         
         hideProgress(processingProgress);
-        return knowledgeBase;
+        return combinedKnowledgeBase;
 
     } catch (error) {
         console.error('Критическая ошибка создания базы знаний:', error);

@@ -35,10 +35,10 @@ const fetchWithRetry = async (url, options, maxRetries = 3, initialDelay = 2000)
             const response = await fetch(url, options);
             console.log(`fetchWithRetry: Получен ответ со статусом ${response.status}`);
             
-            // Если получили 429, делаем повторную попытку с экспоненциальной задержкой
-            if (response.status === 429 && retries < maxRetries) {
+            // Если получили 429 или 500, делаем повторную попытку с экспоненциальной задержкой
+            if ((response.status === 429 || response.status === 500 || response.status === 503) && retries < maxRetries) {
                 const delay = initialDelay * Math.pow(2, retries) + Math.random() * 1000;
-                console.log(`Превышен лимит запросов. Повторная попытка через ${delay/1000} секунд...`);
+                console.log(`Получен статус ${response.status}. Повторная попытка через ${delay/1000} секунд...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 retries++;
                 continue;
@@ -237,12 +237,23 @@ const parseUrl = async (url) => {
 // Обработка через Gemini без кэширования
 const processWithGemini = async (url, content, prompt) => {
     console.log(`processWithGemini: начало выполнения для ${url}`, {contentLength: content.length});
-    const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp-01-21:generateContent?key=${GEMINI_API_KEY}`;
     
     try {
-        // Добавляем логирование до запроса
-        console.log(`processWithGemini: Отправляем запрос к Gemini API, размер контента: ${content.length} символов`);
+        // Уменьшаем размер контента, если он слишком большой
+        let truncatedContent = content;
+        // Проверка на слишком большой контент - 100K символов max для безопасности
+        const MAX_CONTENT_SIZE = 100000;
+        if (content.length > MAX_CONTENT_SIZE) {
+            console.log(`Контент был сокращен с ${content.length} до ${MAX_CONTENT_SIZE} символов`);
+            truncatedContent = content.substring(0, MAX_CONTENT_SIZE) + '... (контент был сокращен из-за большого размера)';
+        }
         
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp-01-21:generateContent?key=${GEMINI_API_KEY}`;
+        
+        // Добавляем логирование до запроса
+        console.log(`processWithGemini: Отправляем запрос к Gemini API, размер контента: ${truncatedContent.length} символов`);
+        
+        // Увеличиваем максимальное количество повторных попыток для ошибок 500
         const response = await fetchWithRetry(geminiApiUrl, {
             method: 'POST',
             headers: {
@@ -250,10 +261,28 @@ const processWithGemini = async (url, content, prompt) => {
             },
             body: JSON.stringify({
                 "contents": [{
-                    "parts": [{"text": prompt + "\n\n" + content}]
-                }]
+                    "parts": [{"text": prompt + "\n\n" + truncatedContent}]
+                }],
+                "safetySettings": [
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                    }
+                ]
             })
-        });
+        }, 5, 3000);  // 5 попыток с начальной задержкой 3 секунды
         
         // Проверка на случай, если fetchWithRetry вернул подделанный объект response
         if (!response || typeof response.ok === 'undefined') {
@@ -266,7 +295,21 @@ const processWithGemini = async (url, content, prompt) => {
         
         if (!response.ok) {
             console.error(`Gemini API error: ${response.status} - ${response.statusText || 'No status text'}`);
-            return 'Ошибка при обращении к API Gemini: ' + response.status;
+            
+            let errorMessage = `Ошибка при обращении к API Gemini: ${response.status}`;
+            
+            // Пытаемся получить более детальную информацию об ошибке
+            try {
+                const errorData = await response.json();
+                if (errorData && errorData.error && errorData.error.message) {
+                    errorMessage += ` - ${errorData.error.message}`;
+                    console.error('Дополнительная информация об ошибке:', errorData.error);
+                }
+            } catch (jsonError) {
+                console.error('Не удалось получить детали ошибки:', jsonError);
+            }
+            
+            return errorMessage;
         }
         
         try {
@@ -277,7 +320,7 @@ const processWithGemini = async (url, content, prompt) => {
                 candidatesCount: data?.candidates?.length
             });
             
-            // Проверка на наличие данных и ограничение размера
+            // Проверка на наличие данных
             if (!data || !data.candidates || !data.candidates[0]) {
                 console.error('processWithGemini: Нет данных в ответе', data);
                 return 'Получен пустой ответ от API Gemini';
@@ -289,17 +332,8 @@ const processWithGemini = async (url, content, prompt) => {
                 return 'Не удалось извлечь текст из ответа API';
             }
             
-            // Ограничение размера ответа для предотвращения проблем
-            const MAX_RESPONSE_SIZE = 500000;
-            let resultText = text;
-            
-            if (text.length > MAX_RESPONSE_SIZE) {
-                console.log(`Ответ Gemini был сокращен с ${text.length} до ${MAX_RESPONSE_SIZE} символов`);
-                resultText = text.substring(0, MAX_RESPONSE_SIZE) + '... (Ответ был сокращен из-за большого размера)';
-            }
-            
-            console.log(`processWithGemini: успешное завершение для ${url}`, {resultLength: resultText.length});
-            return resultText;
+            console.log(`processWithGemini: успешное завершение для ${url}`, {resultLength: text.length});
+            return text;
         } catch (jsonError) {
             console.error("Ошибка при разборе JSON-ответа:", jsonError);
             // Логируем текст ответа для отладки

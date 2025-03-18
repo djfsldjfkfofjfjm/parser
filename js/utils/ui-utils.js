@@ -29,13 +29,46 @@ const switchTab = (tabBtn, contentDiv) => {
 };
 
 // Копирование контента
-const copyContent = async (content, successMessage) => {
+const copyContent = async (content, successMessage = 'Содержимое скопировано в буфер обмена') => {
     try {
-        await navigator.clipboard.writeText(content);
+        let textToCopy = '';
+        
+        // Проверяем, является ли content DOM-элементом
+        if (content instanceof HTMLElement) {
+            // Если это DOM-элемент, извлекаем текст из всех блоков результатов
+            if (content.classList.contains('tab-content')) {
+                // Для общего блока с результатами
+                const blocks = content.querySelectorAll('.parsing-results, .processed-result');
+                textToCopy = Array.from(blocks)
+                    .map(block => {
+                        const url = safeGetTextContent(block, 'h3', 'Неизвестный URL');
+                        const text = safeGetTextContent(block, 'pre', '');
+                        return `URL: ${url}\n\n${text}\n\n-------------------\n`;
+                    })
+                    .join('\n');
+            } else if (content.classList.contains('knowledge-base-content')) {
+                // Для базы знаний
+                textToCopy = content.textContent || '';
+            } else {
+                // Для любого другого элемента
+                textToCopy = content.textContent || content.innerText || '';
+            }
+        } else {
+            // Если это строка или другой тип
+            textToCopy = String(content);
+        }
+        
+        // Проверяем, что есть что копировать
+        if (!textToCopy.trim()) {
+            alert('Нет контента для копирования');
+            return;
+        }
+        
+        await navigator.clipboard.writeText(textToCopy);
         alert(successMessage);
     } catch (err) {
         console.error('Ошибка копирования:', err);
-        alert('Не удалось скопировать результаты. Проверьте консоль.');
+        alert('Не удалось скопировать результаты. Проверьте консоль для деталей.');
     }
 };
 
